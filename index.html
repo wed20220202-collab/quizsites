@@ -274,22 +274,22 @@ function checkAnswers(){
         q.querySelector("select").disabled=true; // ロック
       }
     
-      // 残り店舗採点
-      let marked=false;
+      // 残り店舗採点（全正解チェックをロック）
       remainingCB.forEach(cb=>{
         const label = cb.parentElement;
-        if(cb.checked && correctRemaining.includes(cb.value) && !marked){
-          cb.disabled=true;
+      
+        if(correctRemaining.includes(cb.value)){
+          // 正解チェックは全てロック & 正解マーク
+          cb.disabled = true;
           if(!label.querySelector(".correct")){
-            const span=document.createElement("span");
-            span.className="correct";
-            span.textContent=" 正解";
+            const span = document.createElement("span");
+            span.className = "correct";
+            span.textContent = " 正解";
             label.appendChild(span);
           }
-          marked=true;
-        }
-        if(cb.checked && !correctRemaining.includes(cb.value)){
-          cb.checked=false;
+        } else {
+          // 不正解チェックは外す
+          if(cb.checked) cb.checked = false;
         }
       });
     
