@@ -166,25 +166,29 @@ async function startQuiz() {
 
     // ===== Hard =====
     if (level === "hard") {
-      const same = allQuestions.filter(q => q[1] === code);
-      const sample = shuffle([...same]).slice(0, 5);
-      div.dataset.correctShops = same.map(s => s[0]).join(",");
-
+      // ランダムに2店舗選択して表示
+      const sample = shuffle([...allQuestions]).slice(0, 2);
+      const sampleShops = sample.map(s => s[0]);
+      
+      // それぞれの店舗のコミュニティコード
+      div.dataset.codes = sample.map(s => s[1]).join(",");
+    
+      // コミュニティに存在する残りの店舗（sample以外）
+      const remaining = allQuestions.filter(q => !sampleShops.includes(q[0]));
+      const options = shuffle([...sampleShops, ...remaining.map(r => r[0])]).slice(0, 5);
+    
       div.innerHTML = `
         <div class="question">
-          Q${i+1}. 該当する店舗とコードを選択
+          Q${i+1}. 下記2店舗のコミュニティコードを選んでください
           <div>
-            ${sample.map(s =>
-              `<label><input type="checkbox" value="${s[0]}"> ${s[0]}</label>`
-            ).join("<br>")}
+            ${sampleShops.join(" / ")}
+          </div>
+          <div>
+            ${options.map(s => `<label><input type="checkbox" value="${s}"> ${s}</label>`).join("<br>")}
           </div>
         </div>
-        <div class="answer">
-          ${codeSelect()}
-          <div class="judge"></div>
-        </div>`;
+        <div class="answer"><div class="judge"></div></div>`;
     }
-
     quizArea.appendChild(div);
   });
 }
@@ -215,32 +219,38 @@ function checkAnswers() {
     }
 
     if (level === "normal") {
-      const selectedShops = [...q.querySelectorAll("input:checked")].map(i => i.value);
+      const checkboxes = [...q.querySelectorAll("input")];
+      const selectedShops = checkboxes.filter(i=>i.checked).map(i=>i.value);
       if (selectedShops.length === 0) { judge.textContent = ""; return; }
       answeredCount++;
     
       const correctShops = q.dataset.correctShops.split(",");
     
-      // 正解は最大1つ表示＆チェックをロック
+      // 正解は最大1つだけ表示 & ロック
       let correctMarked = false;
-      selectedShops.forEach(shop => {
-        if (correctShops.includes(shop) && !correctMarked) {
-          const checkbox = [...q.querySelectorAll("input")].find(i => i.value === shop);
-          checkbox.disabled = true; // チェックロック
-          const label = checkbox.parentElement;
+      checkboxes.forEach(cb => {
+        const label = cb.parentElement;
+        // 不正解チェックは外す
+        if (cb.checked && !correctShops.includes(cb.value)) {
+          cb.checked = false;
+        }
+        // 正解でまだマークしていなければマーク & ロック
+        if (cb.checked && correctShops.includes(cb.value) && !correctMarked) {
+          cb.disabled = true; // チェックロック
           if (!label.querySelector(".correct")) {
             const span = document.createElement("span");
             span.className = "correct";
             span.textContent = " 正解";
             label.appendChild(span);
           }
-          correctMarked = true; // これ以上マークしない
+          correctMarked = true;
         }
       });
     
       // 問題全体の判定（正解の店舗すべて選んでいればOK）
-      const shopOK = selectedShops.every(s => correctShops.includes(s)) &&
-                     selectedShops.length === correctShops.length;
+      const finalSelected = checkboxes.filter(i=>i.checked).map(i=>i.value);
+      const shopOK = finalSelected.every(s => correctShops.includes(s)) &&
+                     finalSelected.length === correctShops.length;
     
       if (shopOK) {
         correct++;
@@ -253,21 +263,44 @@ function checkAnswers() {
     }
 
     if (level === "hard") {
-      const codeVal = q.querySelector("select").value;
-      const shopVals = [...q.querySelectorAll("input:checked")].map(i => i.value);
-      if (!codeVal && shopVals.length === 0) { judge.textContent = ""; return; }
+      const checkboxes = [...q.querySelectorAll("input")];
+      const selectedShops = checkboxes.filter(i=>i.checked).map(i=>i.value);
+      if (selectedShops.length === 0) { judge.textContent = ""; return; }
       answeredCount++;
-
-      const codeOK = codeVal === q.dataset.answer;
-      const correctShops = q.dataset.correctShops.split(",");
-      const shopOK = shopVals.every(s => correctShops.includes(s));
-
-      if (codeOK && shopOK) {
-        correct++; 
-        judge.textContent = "正解"; 
+    
+      const correctShops = q.dataset.codes.split(","); // 正解のコミュニティコード
+    
+      // チェックされた店舗の正解判定
+      let correctMarked = false;
+      checkboxes.forEach(cb => {
+        const label = cb.parentElement;
+        if (cb.checked && correctShops.includes(cb.value) && !correctMarked) {
+          cb.disabled = true;
+          if (!label.querySelector(".correct")) {
+            const span = document.createElement("span");
+            span.className = "correct";
+            span.textContent = " 正解";
+            label.appendChild(span);
+          }
+          correctMarked = true;
+        }
+        // 不正解はチェック外す
+        if (cb.checked && !correctShops.includes(cb.value)) {
+          cb.checked = false;
+        }
+      });
+    
+      // 問題全体判定
+      const finalSelected = checkboxes.filter(i=>i.checked).map(i=>i.value);
+      const shopOK = finalSelected.every(s => correctShops.includes(s)) &&
+                     finalSelected.length === correctShops.length;
+    
+      if (shopOK) {
+        correct++;
+        judge.textContent = "正解";
         judge.className = "judge correct";
       } else {
-        judge.textContent = "不正解"; 
+        judge.textContent = `不正解（${correctShops.join(", ")}）`;
         judge.className = "judge wrong";
       }
     }
