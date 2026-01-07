@@ -158,15 +158,21 @@ async function startQuiz() {
 
     // Hard問題生成
     if(level==="hard"){
-      // ランダムに2店舗選択
-      const sample = shuffle([...allQuestions]).slice(0,2);
-      const sampleShops = sample.map(s=>s[0]);
-      const communityCode = sample[0][1]; // 2店舗は同じコミュニティに属す想定
-      div.dataset.correctCode = communityCode;
+      // まずランダムにコミュニティコードを1つ選ぶ
+      const communityCodes = [...new Set(allQuestions.map(q=>q[1]))];
+      const code = communityCodes[Math.floor(Math.random()*communityCodes.length)];
     
-      // 同じコミュニティの他店舗（2店舗除く）
-      const remainingShops = allQuestions.filter(q=>q[1]===communityCode && !sampleShops.includes(q[0])).map(q=>q[0]);
-      div.dataset.correctRemaining = remainingShops.join(",");
+      // 同じコミュニティ内の店舗を取得
+      const communityShops = allQuestions.filter(q=>q[1]===code).map(q=>q[0]);
+    
+      // その中からランダムに2店舗を問題用に選ぶ
+      const sampleShops = shuffle([...communityShops]).slice(0,2);
+    
+      div.dataset.correctCode = code; // コード正解
+      div.dataset.correctRemaining = communityShops.filter(s=>!sampleShops.includes(s)).join(",");
+    
+      // 残り店舗の選択肢（2店舗除くコミュニティ内店舗）
+      const remainingOptions = shuffle([...communityShops.filter(s=>!sampleShops.includes(s))]);
     
       div.innerHTML = `
         <div class="question">
@@ -182,7 +188,7 @@ async function startQuiz() {
           </label>
           <div>
             残り店舗を選択:<br>
-            ${remainingShops.map(s=>`<label><input type="checkbox" value="${s}"> ${s}</label>`).join("<br>")}
+            ${remainingOptions.map(s=>`<label><input type="checkbox" value="${s}"> ${s}</label>`).join("<br>")}
           </div>
           <div class="judge"></div>
         </div>`;
