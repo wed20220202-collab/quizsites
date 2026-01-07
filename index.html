@@ -15,7 +15,7 @@ body {
   padding: 20px;
 }
 
-select, input[type="file"], button {
+select, button {
   padding: 8px;
   font-size: 16px;
   margin: 5px 5px 10px 0;
@@ -32,20 +32,8 @@ select, input[type="file"], button {
 .question { width: 60%; }
 .answer { width: 40%; }
 
-.correct {
-  color: #4caf50;
-  font-weight: bold;
-}
-
-.wrong {
-  color: #f44336;
-  font-weight: bold;
-}
-
-#result {
-  margin-top: 20px;
-  font-size: 18px;
-}
+.correct { color: #4caf50; font-weight: bold; }
+.wrong   { color: #f44336; font-weight: bold; }
 </style>
 </head>
 
@@ -61,7 +49,6 @@ select, input[type="file"], button {
   <option value="50">50問</option>
 </select>
 
-<input type="file" id="excel" accept=".xlsx">
 <button onclick="startQuiz()">開始</button>
 <button onclick="checkAnswers()">答え合わせ</button>
 
@@ -72,7 +59,7 @@ select, input[type="file"], button {
 
 <script>
 // ===============================
-// 固定選択肢（重複除外済）
+// 固定選択肢
 // ===============================
 const CHOICES = [
   "C010","C011","C020","C030","C040","C041","C060","C070","C080","C081",
@@ -84,38 +71,37 @@ const CHOICES = [
   "C234","C235","C236","C240","C241","C250","C261","C271","C272","C273",
   "C274","C275","C277","C278","C280","C281","C282","C283","C284","C290",
   "C330","C340","C370","C400","C401","C430","C440",
-  "C12A","C12B",
-  "C13A","C13B","C13C","C13D","C13E","C13F","C13H","C13I","C13J",
+  "C12A","C12B","C13A","C13B","C13C","C13D","C13E","C13F","C13H","C13I","C13J",
   "C14A"
 ];
 
-// Excelから読み込んだ全問題
 let allQuestions = [];
 let currentQuestions = [];
 
-// Excel読み込み
-document.getElementById("excel").addEventListener("change", function (e) {
-  const file = e.target.files[0];
-  const reader = new FileReader();
-
-  reader.onload = function (e) {
-    const data = new Uint8Array(e.target.result);
+// ===============================
+// GitHub上のExcelを読み込む
+// ===============================
+fetch("quiz.xlsx")
+  .then(res => res.arrayBuffer())
+  .then(data => {
     const workbook = XLSX.read(data, { type: "array" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-    // A列: 問題文, B列: 正解
     allQuestions = rows.filter(r => r[0] && r[1]);
-    alert(`問題を ${allQuestions.length} 問読み込みました`);
-  };
+    console.log(`読み込み完了：${allQuestions.length} 問`);
+  })
+  .catch(err => {
+    alert("Excelの読み込みに失敗しました");
+    console.error(err);
+  });
 
-  reader.readAsArrayBuffer(file);
-});
-
+// ===============================
 // クイズ開始
+// ===============================
 function startQuiz() {
   if (allQuestions.length === 0) {
-    alert("先にExcelを読み込んでください");
+    alert("問題データが読み込まれていません");
     return;
   }
 
@@ -126,17 +112,13 @@ function startQuiz() {
   quizArea.innerHTML = "";
   document.getElementById("result").innerHTML = "";
 
-  currentQuestions.forEach((row, index) => {
-    const question = row[0];
-
+  currentQuestions.forEach((row, i) => {
     const div = document.createElement("div");
     div.className = "quiz";
     div.dataset.answer = row[1];
 
     div.innerHTML = `
-      <div class="question">
-        Q${index + 1}. ${question}
-      </div>
+      <div class="question">Q${i + 1}. ${row[0]}</div>
       <div class="answer">
         <select>
           <option value="">選択してください</option>
@@ -145,48 +127,42 @@ function startQuiz() {
         <div class="judge"></div>
       </div>
     `;
-
     quizArea.appendChild(div);
   });
 }
 
+// ===============================
 // 答え合わせ
+// ===============================
 function checkAnswers() {
   let correct = 0;
-  const quizzes = document.querySelectorAll(".quiz");
 
-  quizzes.forEach(q => {
-    const correctAnswer = q.dataset.answer;
-    const selected = q.querySelector("select").value;
+  document.querySelectorAll(".quiz").forEach(q => {
+    const ans = q.dataset.answer;
+    const sel = q.querySelector("select").value;
     const judge = q.querySelector(".judge");
 
-    if (!selected) {
-      judge.textContent = "未回答";
-      judge.className = "judge wrong";
-      return;
-    }
-
-    if (selected === correctAnswer) {
+    if (sel === ans) {
       correct++;
       judge.textContent = "正解";
       judge.className = "judge correct";
     } else {
-      judge.textContent = `不正解（正解：${correctAnswer}）`;
+      judge.textContent = `不正解（正解：${ans}）`;
       judge.className = "judge wrong";
     }
   });
 
   document.getElementById("result").textContent =
-    `結果：${correct} / ${quizzes.length} 問 正解`;
+    `結果：${correct} / ${currentQuestions.length} 問 正解`;
 }
 
 // シャッフル
-function shuffle(array) {
-  for (let i = array.length - 1; i > 0; i--) {
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  return array;
+  return a;
 }
 </script>
 
