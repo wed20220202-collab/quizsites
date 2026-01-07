@@ -156,21 +156,21 @@ async function startQuiz() {
         <div class="answer"><div class="judge"></div></div>`;
     }
 
-    // ===== Hard =====
+    // Hard問題生成
     if(level==="hard"){
-      // ランダムに2店舗だけ表示
+      // ランダムに2店舗選択
       const sample = shuffle([...allQuestions]).slice(0,2);
       const sampleShops = sample.map(s=>s[0]);
-      div.dataset.correctCode = sample[0][1]; // コードは1つに
-      div.dataset.correctRemaining = allQuestions.filter(q=>!sampleShops.includes(q[0]) && q[1]===sample[0][1]).map(q=>q[0]).join(",");
-
-      // 残り店舗選択欄
-      const remainingOptions = shuffle([...allQuestions.filter(q=>!sampleShops.includes(q[0]) && q[1]===sample[0][1])])
-        .map(q=>q[0]);
-
+      const communityCode = sample[0][1]; // 2店舗は同じコミュニティに属す想定
+      div.dataset.correctCode = communityCode;
+    
+      // 同じコミュニティの他店舗（2店舗除く）
+      const remainingShops = allQuestions.filter(q=>q[1]===communityCode && !sampleShops.includes(q[0])).map(q=>q[0]);
+      div.dataset.correctRemaining = remainingShops.join(",");
+    
       div.innerHTML = `
         <div class="question">
-          Q${i+1}. 以下2店舗のコミュニティコードを選んでください<br>
+          Q${i+1}. 下記2店舗のコミュニティコードを選んでください<br>
           ${sampleShops.join(" / ")}
         </div>
         <div class="answer">
@@ -182,7 +182,7 @@ async function startQuiz() {
           </label>
           <div>
             残り店舗を選択:<br>
-            ${remainingOptions.map(s=>`<label><input type="checkbox" value="${s}"> ${s}</label>`).join("<br>")}
+            ${remainingShops.map(s=>`<label><input type="checkbox" value="${s}"> ${s}</label>`).join("<br>")}
           </div>
           <div class="judge"></div>
         </div>`;
@@ -251,50 +251,54 @@ function checkAnswers(){
       totalScore+=score;
     }
 
+    // Hard問題採点
     if(level==="hard"){
+      let score=0;
       answeredCount++;
       const codeVal = q.querySelector("select").value;
       const remainingCB = [...q.querySelectorAll("input")];
       const remainingSelected = remainingCB.filter(i=>i.checked).map(i=>i.value);
-
+    
       const correctCode = q.dataset.correctCode;
       const correctRemaining = q.dataset.correctRemaining.split(",");
-
-      // コード正解
+    
+      // コード採点
       if(codeVal===correctCode){
         score+=1;
-        q.querySelector("select").disabled=true;
+        q.querySelector("select").disabled=true; // ロック
       }
-
-      // 残り店舗正解判定
-      let remainingCorrectMarked=false;
+    
+      // 残り店舗採点
+      let marked=false;
       remainingCB.forEach(cb=>{
         const label = cb.parentElement;
+        if(cb.checked && correctRemaining.includes(cb.value) && !marked){
+          cb.disabled=true;
+          if(!label.querySelector(".correct")){
+            const span=document.createElement("span");
+            span.className="correct";
+            span.textContent=" 正解";
+            label.appendChild(span);
+          }
+          marked=true;
+        }
         if(cb.checked && !correctRemaining.includes(cb.value)){
           cb.checked=false;
         }
-        if(cb.checked && correctRemaining.includes(cb.value) && !remainingCorrectMarked){
-          cb.disabled=true;
-          if(!label.querySelector(".correct")){
-            const span = document.createElement("span");
-            span.className="correct"; span.textContent=" 正解";
-            label.appendChild(span);
-          }
-          remainingCorrectMarked=true;
-        }
       });
-
-      // 残り店舗完全正解で+1点
-      const finalRemaining=remainingCB.filter(i=>i.checked).map(i=>i.value);
-      const remainingOK = finalRemaining.every(s=>correctRemaining.includes(s)) && finalRemaining.length===correctRemaining.length;
+    
+      // 残り店舗完全正解で +1点
+      const finalRemaining = remainingCB.filter(i=>i.checked).map(i=>i.value);
+      const remainingOK = finalRemaining.every(s=>correctRemaining.includes(s)) &&
+                          finalRemaining.length===correctRemaining.length;
       if(remainingOK) score+=1;
-
-      // 問題全体の判定
-      if(score===2) judge.textContent="完全正解"; 
-      else if(score===1) judge.textContent="部分正解"; 
+    
+      // 問題ごとの表示
+      if(score===2) judge.textContent="完全正解";
+      else if(score===1) judge.textContent="部分正解";
       else judge.textContent=`不正解（コード:${correctCode} / 残店舗:${correctRemaining.join(", ")})`;
       judge.className = score>0?"judge correct":"judge wrong";
-
+    
       totalScore+=score;
     }
 
