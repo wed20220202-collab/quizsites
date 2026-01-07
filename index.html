@@ -218,19 +218,29 @@ function checkAnswers() {
       const selectedShops = [...q.querySelectorAll("input:checked")].map(i => i.value);
       if (selectedShops.length === 0) { judge.textContent = ""; return; }
       answeredCount++;
-
+    
       const correctShops = q.dataset.correctShops.split(",");
-
+    
+      // 選択済みチェックボックスに正解表示（チェックはそのまま）
       selectedShops.forEach(shop => {
-        const label = [...q.querySelectorAll("input")].find(i=>i.value===shop).parentElement;
         if (correctShops.includes(shop)) {
-          label.innerHTML += ' <span class="correct">正解</span>';
+          const label = [...q.querySelectorAll("input")]
+                        .find(i => i.value === shop)
+                        .parentElement;
+          // 既に正解表示が付いている場合は追加しない
+          if (!label.querySelector(".correct")) {
+            const span = document.createElement("span");
+            span.className = "correct";
+            span.textContent = " 正解";
+            label.appendChild(span);
+          }
         }
       });
-
+    
+      // 問題全体の判定
       const shopOK = selectedShops.every(s => correctShops.includes(s)) &&
                      selectedShops.length === correctShops.length;
-
+    
       if (shopOK) {
         correct++;
         judge.textContent = "正解"; 
