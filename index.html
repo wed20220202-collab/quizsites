@@ -2,167 +2,160 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>クイズサイト</title>
+<title>地域 × 難易度クイズ</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 body {
   font-family: system-ui, sans-serif;
-  background: #111;
-  color: #fff;
-  padding: 20px;
+  background:#111;
+  color:#fff;
+  padding:20px;
 }
-
 select, button {
-  padding: 8px;
-  font-size: 16px;
-  margin: 5px 5px 10px 0;
+  padding:8px;
+  margin:5px 0;
 }
-
-.quiz {
-  display: flex;
-  gap: 20px;
-  margin: 12px 0;
-  padding: 10px;
-  border-bottom: 1px solid #333;
+.quiz-box {
+  margin-top:20px;
+  padding:15px;
+  background:#222;
+  border-radius:8px;
 }
-
-.question { width: 60%; }
-.answer { width: 40%; }
-
-.correct { color: #4caf50; font-weight: bold; }
-.wrong   { color: #f44336; font-weight: bold; }
+.choice {
+  margin:5px 0;
+}
 </style>
 </head>
-
 <body>
 
-<h2>📘 クイズ</h2>
+<h2>🧠 クイズ設定</h2>
 
-<label>出題数：</label>
-<select id="questionCount">
-  <option value="10">10問</option>
-  <option value="20">20問</option>
-  <option value="30">30問</option>
-  <option value="50">50問</option>
-</select>
+<label>地域難易度</label><br>
+<select id="region">
+  <option value="all.xlsx">全国</option>
+  <option value="metropolitan.xlsx">首都圏</option>
+  <option value="tokyo.xlsx">東京都</option>
+</select><br>
 
-<button onclick="startQuiz()">開始</button>
-<button onclick="checkAnswers()">答え合わせ</button>
+<label>ゲーム難易度</label><br>
+<select id="difficulty">
+  <option value="easy">Easy</option>
+  <option value="normal">Normal</option>
+  <option value="hard">Hard</option>
+</select><br>
 
-<hr>
+<label>問題数</label><br>
+<select id="count">
+  <option>10</option>
+  <option>20</option>
+  <option>30</option>
+  <option>50</option>
+</select><br>
 
-<div id="quiz-area"></div>
-<div id="result"></div>
+<button onclick="startGame()">START</button>
+
+<div id="quiz" class="quiz-box"></div>
+<button id="checkBtn" style="display:none" onclick="checkAnswer()">答え合わせ</button>
 
 <script>
-// ===============================
-// 固定選択肢
-// ===============================
-const CHOICES = [
-  "C010","C011","C020","C030","C040","C041","C060","C070","C080","C081",
-  "C090","C100","C110","C113","C114","C115","C116","C118","C119","C120",
-  "C121","C122","C123","C124","C126","C128","C129","C130","C131","C132",
-  "C133","C134","C135","C136","C137","C138","C140","C141","C142","C143",
-  "C144","C145","C146","C147","C148","C149","C150","C160","C170","C190",
-  "C200","C210","C211","C220","C221","C222","C230","C231","C232","C233",
-  "C234","C235","C236","C240","C241","C250","C261","C271","C272","C273",
-  "C274","C275","C277","C278","C280","C281","C282","C283","C284","C290",
-  "C330","C340","C370","C400","C401","C430","C440",
-  "C12A","C12B","C13A","C13B","C13C","C13D","C13E","C13F","C13H","C13I","C13J",
-  "C14A"
-];
+let data = [];
+let current = null;
+let correct = null;
 
-let allQuestions = [];
-let currentQuestions = [];
+async function startGame() {
+  const file = document.getElementById("region").value;
+  const diff = document.getElementById("difficulty").value;
 
-// ===============================
-// GitHub上のExcelを読み込む
-// ===============================
-fetch("quiz.xlsx")
-  .then(res => res.arrayBuffer())
-  .then(data => {
-    const workbook = XLSX.read(data, { type: "array" });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  const res = await fetch(file);
+  const buf = await res.arrayBuffer();
+  const wb = XLSX.read(buf, {type:"array"});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  data = XLSX.utils.sheet_to_json(ws, {header:1});
 
-    allQuestions = rows.filter(r => r[0] && r[1]);
-    console.log(`読み込み完了：${allQuestions.length} 問`);
-  })
-  .catch(err => {
-    alert("Excelの読み込みに失敗しました");
-    console.error(err);
+  generateQuestion(diff);
+}
+
+function generateQuestion(diff) {
+  const q = data[Math.floor(Math.random()*data.length)];
+  const shop = q[0];
+  const code = q[1];
+  const quiz = document.getElementById("quiz");
+  quiz.innerHTML = "";
+
+  if(diff === "easy"){
+    quiz.innerHTML = `<h3>${shop}</h3>`;
+    quiz.innerHTML += codeSelect();
+    correct = code;
+  }
+
+  if(diff === "normal"){
+    quiz.innerHTML = `<h3>コミュニティコード：${code}</h3>`;
+    quiz.innerHTML += shopSelect();
+    correct = shop;
+  }
+
+  if(diff === "hard"){
+    const sameCode = data.filter(d => d[1] === code);
+    const display = sameCode.sort(()=>0.5-Math.random()).slice(0,5);
+
+    quiz.innerHTML = `<h3>該当する店舗とコードを選べ</h3>`;
+    quiz.innerHTML += codeSelect();
+    display.forEach(s=>{
+      quiz.innerHTML += `
+        <div>
+          <input type="checkbox" value="${s[0]}"> ${s[0]}
+        </div>`;
+    });
+
+    correct = {
+      code: code,
+      shops: sameCode.map(s=>s[0])
+    };
+  }
+
+  document.getElementById("checkBtn").style.display="block";
+}
+
+function codeSelect(){
+  return `
+  <select id="answer">
+    <option>CODE-A</option>
+    <option>CODE-B</option>
+    <option>CODE-C</option>
+    <option>CODE-D</option>
+  </select>`;
+}
+
+function shopSelect(){
+  let html = `<select id="answer">`;
+  data.forEach(d=>{
+    html += `<option>${d[0]}</option>`;
   });
+  html += `</select>`;
+  return html;
+}
 
-// ===============================
-// クイズ開始
-// ===============================
-function startQuiz() {
-  if (allQuestions.length === 0) {
-    alert("問題データが読み込まれていません");
+function checkAnswer(){
+  const diff = document.getElementById("difficulty").value;
+
+  if(diff !== "hard"){
+    const ans = document.getElementById("answer").value;
+    alert(ans === correct ? "⭕ 正解" : "❌ 不正解");
     return;
   }
 
-  const count = Number(document.getElementById("questionCount").value);
-  currentQuestions = shuffle([...allQuestions]).slice(0, count);
+  const codeAns = document.getElementById("answer").value;
+  const shopAns = [...document.querySelectorAll("input[type=checkbox]:checked")]
+                  .map(c=>c.value);
 
-  const quizArea = document.getElementById("quiz-area");
-  quizArea.innerHTML = "";
-  document.getElementById("result").innerHTML = "";
+  const ok =
+    codeAns === correct.code &&
+    shopAns.every(s => correct.shops.includes(s));
 
-  currentQuestions.forEach((row, i) => {
-    const div = document.createElement("div");
-    div.className = "quiz";
-    div.dataset.answer = row[1];
-
-    div.innerHTML = `
-      <div class="question">Q${i + 1}. ${row[0]}</div>
-      <div class="answer">
-        <select>
-          <option value="">選択してください</option>
-          ${CHOICES.map(c => `<option value="${c}">${c}</option>`).join("")}
-        </select>
-        <div class="judge"></div>
-      </div>
-    `;
-    quizArea.appendChild(div);
-  });
-}
-
-// ===============================
-// 答え合わせ
-// ===============================
-function checkAnswers() {
-  let correct = 0;
-
-  document.querySelectorAll(".quiz").forEach(q => {
-    const ans = q.dataset.answer;
-    const sel = q.querySelector("select").value;
-    const judge = q.querySelector(".judge");
-
-    if (sel === ans) {
-      correct++;
-      judge.textContent = "正解";
-      judge.className = "judge correct";
-    } else {
-      judge.textContent = `不正解（正解：${ans}）`;
-      judge.className = "judge wrong";
-    }
-  });
-
-  document.getElementById("result").textContent =
-    `結果：${correct} / ${currentQuestions.length} 問 正解`;
-}
-
-// シャッフル
-function shuffle(a) {
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
+  alert(ok ? "⭕ 正解" : "❌ 不正解");
 }
 </script>
 
