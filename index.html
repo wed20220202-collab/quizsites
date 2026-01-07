@@ -180,42 +180,70 @@ async function startQuiz() {
 function checkAnswers() {
   const level = document.getElementById("level").value;
   let correct = 0;
+  let answeredCount = 0; // ← 選択済みの問題数をカウントする変数
 
   document.querySelectorAll(".quiz").forEach(q => {
     const judge = q.querySelector(".judge");
 
     if (level === "easy") {
-      if (q.querySelector("select").value === q.dataset.answer) {
-        correct++; judge.textContent="正解"; judge.className="judge correct";
+      const val = q.querySelector("select").value;
+      if (!val) { // ← 選択されていなければ判定せず
+        judge.textContent = ""; // 表示も消す
+        return;
+      }
+      answeredCount++;
+      if (val === q.dataset.answer) {
+        correct++; 
+        judge.textContent = "正解"; 
+        judge.className = "judge correct";
       } else {
-        judge.textContent=`不正解（${q.dataset.answer}）`; judge.className="judge wrong";
+        judge.textContent = `不正解（${q.dataset.answer}）`; 
+        judge.className = "judge wrong";
       }
     }
 
     if (level === "normal") {
-      if (q.querySelector("select").value === q.dataset.shop) {
-        correct++; judge.textContent="正解"; judge.className="judge correct";
+      const val = q.querySelector("select").value;
+      if (!val) { judge.textContent = ""; return; }
+      answeredCount++;
+      if (val === q.dataset.shop) {
+        correct++; 
+        judge.textContent = "正解"; 
+        judge.className = "judge correct";
       } else {
-        judge.textContent=`不正解（${q.dataset.shop}）`; judge.className="judge wrong";
+        judge.textContent = `不正解（${q.dataset.shop}）`; 
+        judge.className = "judge wrong";
       }
     }
 
     if (level === "hard") {
-      const codeOK = q.querySelector("select").value === q.dataset.answer;
-      const shops = [...q.querySelectorAll("input:checked")].map(i=>i.value);
+      const codeVal = q.querySelector("select").value;
+      const shopVals = [...q.querySelectorAll("input:checked")].map(i => i.value);
+
+      // 選択されていなければ判定しない
+      if (!codeVal && shopVals.length === 0) {
+        judge.textContent = ""; 
+        return;
+      }
+      answeredCount++;
+      
+      const codeOK = codeVal === q.dataset.answer;
       const correctShops = q.dataset.correctShops.split(",");
-      const shopOK = shops.every(s => correctShops.includes(s));
+      const shopOK = shopVals.every(s => correctShops.includes(s));
 
       if (codeOK && shopOK) {
-        correct++; judge.textContent="正解"; judge.className="judge correct";
+        correct++; 
+        judge.textContent = "正解"; 
+        judge.className = "judge correct";
       } else {
-        judge.textContent="不正解"; judge.className="judge wrong";
+        judge.textContent = "不正解"; 
+        judge.className = "judge wrong";
       }
     }
   });
 
   document.getElementById("result").textContent =
-    `結果：${correct} / ${currentQuestions.length} 問 正解`;
+    `結果：${correct} / ${answeredCount} 問 正解`; // ← 選択済み問題だけで表示
 }
 
 // ===============================
