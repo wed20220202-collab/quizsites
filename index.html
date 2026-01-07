@@ -221,23 +221,24 @@ function checkAnswers() {
     
       const correctShops = q.dataset.correctShops.split(",");
     
-      // 選択済みチェックボックスに正解表示（チェックはそのまま）
+      // 正解は最大1つ表示＆チェックをロック
+      let correctMarked = false;
       selectedShops.forEach(shop => {
-        if (correctShops.includes(shop)) {
-          const label = [...q.querySelectorAll("input")]
-                        .find(i => i.value === shop)
-                        .parentElement;
-          // 既に正解表示が付いている場合は追加しない
+        if (correctShops.includes(shop) && !correctMarked) {
+          const checkbox = [...q.querySelectorAll("input")].find(i => i.value === shop);
+          checkbox.disabled = true; // チェックロック
+          const label = checkbox.parentElement;
           if (!label.querySelector(".correct")) {
             const span = document.createElement("span");
             span.className = "correct";
             span.textContent = " 正解";
             label.appendChild(span);
           }
+          correctMarked = true; // これ以上マークしない
         }
       });
     
-      // 問題全体の判定
+      // 問題全体の判定（正解の店舗すべて選んでいればOK）
       const shopOK = selectedShops.every(s => correctShops.includes(s)) &&
                      selectedShops.length === correctShops.length;
     
