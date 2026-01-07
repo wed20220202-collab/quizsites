@@ -2,160 +2,247 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>地域 × 難易度クイズ</title>
+<title>クイズサイト</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
 body {
   font-family: system-ui, sans-serif;
-  background:#111;
-  color:#fff;
-  padding:20px;
+  background: #111;
+  color: #fff;
+  padding: 20px;
 }
+
 select, button {
-  padding:8px;
-  margin:5px 0;
+  padding: 8px;
+  font-size: 16px;
+  margin: 5px 5px 10px 0;
 }
-.quiz-box {
-  margin-top:20px;
-  padding:15px;
-  background:#222;
-  border-radius:8px;
+
+.quiz {
+  margin: 12px 0;
+  padding: 10px;
+  border-bottom: 1px solid #333;
 }
-.choice {
-  margin:5px 0;
-}
+
+.question { margin-bottom: 6px; }
+.answer { margin-top: 6px; }
+
+.correct { color: #4caf50; font-weight: bold; }
+.wrong   { color: #f44336; font-weight: bold; }
 </style>
 </head>
+
 <body>
 
-<h2>🧠 クイズ設定</h2>
+<h2>📘 クイズ</h2>
 
-<label>地域難易度</label><br>
+<label>地域：</label>
 <select id="region">
   <option value="all.xlsx">全国</option>
   <option value="metropolitan.xlsx">首都圏</option>
   <option value="tokyo.xlsx">東京都</option>
-</select><br>
+</select>
 
-<label>ゲーム難易度</label><br>
-<select id="difficulty">
+<label>レベル：</label>
+<select id="level">
   <option value="easy">Easy</option>
   <option value="normal">Normal</option>
   <option value="hard">Hard</option>
-</select><br>
+</select>
 
-<label>問題数</label><br>
-<select id="count">
-  <option>10</option>
-  <option>20</option>
-  <option>30</option>
-  <option>50</option>
-</select><br>
+<label>出題数：</label>
+<select id="questionCount">
+  <option value="10">10問</option>
+  <option value="20">20問</option>
+  <option value="30">30問</option>
+  <option value="50">50問</option>
+</select>
 
-<button onclick="startGame()">START</button>
+<br>
 
-<div id="quiz" class="quiz-box"></div>
-<button id="checkBtn" style="display:none" onclick="checkAnswer()">答え合わせ</button>
+<button onclick="startQuiz()">開始</button>
+<button onclick="checkAnswers()">答え合わせ</button>
+
+<hr>
+
+<div id="quiz-area"></div>
+<div id="result"></div>
 
 <script>
-let data = [];
-let current = null;
-let correct = null;
+// ===============================
+// コミュニティコード（固定）
+// ===============================
+const CHOICES = [
+  "C010","C011","C020","C030","C040","C041","C060","C070","C080","C081",
+  "C090","C100","C110","C113","C114","C115","C116","C118","C119","C120",
+  "C121","C122","C123","C124","C126","C128","C129","C130","C131","C132",
+  "C133","C134","C135","C136","C137","C138","C140","C141","C142","C143",
+  "C144","C145","C146","C147","C148","C149","C150","C160","C170","C190",
+  "C200","C210","C211","C220","C221","C222","C230","C231","C232","C233",
+  "C234","C235","C236","C240","C241","C250","C261","C271","C272","C273",
+  "C274","C275","C277","C278","C280","C281","C282","C283","C284","C290",
+  "C330","C340","C370","C400","C401","C430","C440",
+  "C12A","C12B","C13A","C13B","C13C","C13D","C13E","C13F","C13H","C13I","C13J",
+  "C14A"
+];
 
-async function startGame() {
+let allQuestions = [];
+let currentQuestions = [];
+
+// ===============================
+// Excel読込（地域切替）
+// ===============================
+async function loadExcel() {
   const file = document.getElementById("region").value;
-  const diff = document.getElementById("difficulty").value;
-
   const res = await fetch(file);
-  const buf = await res.arrayBuffer();
-  const wb = XLSX.read(buf, {type:"array"});
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  data = XLSX.utils.sheet_to_json(ws, {header:1});
-
-  generateQuestion(diff);
+  const data = await res.arrayBuffer();
+  const wb = XLSX.read(data, { type: "array" });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  allQuestions = rows.filter(r => r[0] && r[1]);
 }
 
-function generateQuestion(diff) {
-  const q = data[Math.floor(Math.random()*data.length)];
-  const shop = q[0];
-  const code = q[1];
-  const quiz = document.getElementById("quiz");
-  quiz.innerHTML = "";
+// ===============================
+// クイズ開始
+// ===============================
+async function startQuiz() {
+  await loadExcel();
 
-  if(diff === "easy"){
-    quiz.innerHTML = `<h3>${shop}</h3>`;
-    quiz.innerHTML += codeSelect();
-    correct = code;
-  }
+  const level = document.getElementById("level").value;
+  const count = Number(document.getElementById("questionCount").value);
 
-  if(diff === "normal"){
-    quiz.innerHTML = `<h3>コミュニティコード：${code}</h3>`;
-    quiz.innerHTML += shopSelect();
-    correct = shop;
-  }
+  currentQuestions = shuffle([...allQuestions]).slice(0, count);
 
-  if(diff === "hard"){
-    const sameCode = data.filter(d => d[1] === code);
-    const display = sameCode.sort(()=>0.5-Math.random()).slice(0,5);
+  const quizArea = document.getElementById("quiz-area");
+  quizArea.innerHTML = "";
+  document.getElementById("result").textContent = "";
 
-    quiz.innerHTML = `<h3>該当する店舗とコードを選べ</h3>`;
-    quiz.innerHTML += codeSelect();
-    display.forEach(s=>{
-      quiz.innerHTML += `
-        <div>
-          <input type="checkbox" value="${s[0]}"> ${s[0]}
+  currentQuestions.forEach((row, i) => {
+    const shop = row[0];
+    const code = row[1];
+
+    const div = document.createElement("div");
+    div.className = "quiz";
+    div.dataset.shop = shop;
+    div.dataset.answer = code;
+
+    // ===== Easy =====
+    if (level === "easy") {
+      div.innerHTML = `
+        <div class="question">Q${i+1}. ${shop}</div>
+        <div class="answer">
+          ${codeSelect()}
+          <div class="judge"></div>
         </div>`;
-    });
+    }
 
-    correct = {
-      code: code,
-      shops: sameCode.map(s=>s[0])
-    };
-  }
+    // ===== Normal =====
+    if (level === "normal") {
+      div.innerHTML = `
+        <div class="question">Q${i+1}. コミュニティコード：${code}</div>
+        <div class="answer">
+          ${shopSelect()}
+          <div class="judge"></div>
+        </div>`;
+    }
 
-  document.getElementById("checkBtn").style.display="block";
-}
+    // ===== Hard =====
+    if (level === "hard") {
+      const same = allQuestions.filter(q => q[1] === code);
+      const sample = shuffle([...same]).slice(0, 5);
+      div.dataset.correctShops = same.map(s => s[0]).join(",");
 
-function codeSelect(){
-  return `
-  <select id="answer">
-    <option>CODE-A</option>
-    <option>CODE-B</option>
-    <option>CODE-C</option>
-    <option>CODE-D</option>
-  </select>`;
-}
+      div.innerHTML = `
+        <div class="question">
+          Q${i+1}. 該当する店舗とコードを選択
+          <div>
+            ${sample.map(s =>
+              `<label><input type="checkbox" value="${s[0]}"> ${s[0]}</label>`
+            ).join("<br>")}
+          </div>
+        </div>
+        <div class="answer">
+          ${codeSelect()}
+          <div class="judge"></div>
+        </div>`;
+    }
 
-function shopSelect(){
-  let html = `<select id="answer">`;
-  data.forEach(d=>{
-    html += `<option>${d[0]}</option>`;
+    quizArea.appendChild(div);
   });
-  html += `</select>`;
-  return html;
 }
 
-function checkAnswer(){
-  const diff = document.getElementById("difficulty").value;
+// ===============================
+// 答え合わせ
+// ===============================
+function checkAnswers() {
+  const level = document.getElementById("level").value;
+  let correct = 0;
 
-  if(diff !== "hard"){
-    const ans = document.getElementById("answer").value;
-    alert(ans === correct ? "⭕ 正解" : "❌ 不正解");
-    return;
+  document.querySelectorAll(".quiz").forEach(q => {
+    const judge = q.querySelector(".judge");
+
+    if (level === "easy") {
+      if (q.querySelector("select").value === q.dataset.answer) {
+        correct++; judge.textContent="正解"; judge.className="judge correct";
+      } else {
+        judge.textContent=`不正解（${q.dataset.answer}）`; judge.className="judge wrong";
+      }
+    }
+
+    if (level === "normal") {
+      if (q.querySelector("select").value === q.dataset.shop) {
+        correct++; judge.textContent="正解"; judge.className="judge correct";
+      } else {
+        judge.textContent=`不正解（${q.dataset.shop}）`; judge.className="judge wrong";
+      }
+    }
+
+    if (level === "hard") {
+      const codeOK = q.querySelector("select").value === q.dataset.answer;
+      const shops = [...q.querySelectorAll("input:checked")].map(i=>i.value);
+      const correctShops = q.dataset.correctShops.split(",");
+      const shopOK = shops.every(s => correctShops.includes(s));
+
+      if (codeOK && shopOK) {
+        correct++; judge.textContent="正解"; judge.className="judge correct";
+      } else {
+        judge.textContent="不正解"; judge.className="judge wrong";
+      }
+    }
+  });
+
+  document.getElementById("result").textContent =
+    `結果：${correct} / ${currentQuestions.length} 問 正解`;
+}
+
+// ===============================
+// 共通部品
+// ===============================
+function codeSelect() {
+  return `
+    <select>
+      <option value="">選択してください</option>
+      ${CHOICES.map(c => `<option value="${c}">${c}</option>`).join("")}
+    </select>`;
+}
+
+function shopSelect() {
+  return `
+    <select>
+      <option value="">選択してください</option>
+      ${allQuestions.map(q => `<option>${q[0]}</option>`).join("")}
+    </select>`;
+}
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
-
-  const codeAns = document.getElementById("answer").value;
-  const shopAns = [...document.querySelectorAll("input[type=checkbox]:checked")]
-                  .map(c=>c.value);
-
-  const ok =
-    codeAns === correct.code &&
-    shopAns.every(s => correct.shops.includes(s));
-
-  alert(ok ? "⭕ 正解" : "❌ 不正解");
+  return a;
 }
 </script>
 
